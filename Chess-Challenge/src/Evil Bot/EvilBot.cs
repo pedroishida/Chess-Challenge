@@ -3,7 +3,8 @@ using System;
 
 namespace ChessChallenge.Example
 {
-    // A simple bot that can spot mate in one, and always captures the most valuable piece it can.
+    // A simple bot that can spot mate in one, and always captures the most
+    // valuable piece it can.
     // Plays randomly otherwise.
     public class EvilBot : IChessBot
     {
@@ -14,10 +15,18 @@ namespace ChessChallenge.Example
         {
             Move[] allMoves = board.GetLegalMoves();
 
-            // Pick a random move to play if nothing better is found
             Random rng = new();
-            Move moveToPlay = allMoves[rng.Next(allMoves.Length)];
+            Move moveToPlay = allMoves[0];
             int highestValueCapture = 0;
+
+            // Pick a random move to play that does not put the piece in danger
+            int i = 0;
+            do
+            {
+                moveToPlay = allMoves[rng.Next(allMoves.Length)];
+                i++;
+            } while (i < allMoves.Length &&
+                board.SquareIsAttackedByOpponent(moveToPlay.TargetSquare));
 
             foreach (Move move in allMoves)
             {
@@ -29,8 +38,18 @@ namespace ChessChallenge.Example
                 }
 
                 // Find highest value capture
-                Piece capturedPiece = board.GetPiece(move.TargetSquare);
-                int capturedPieceValue = pieceValues[(int)capturedPiece.PieceType];
+                int capturedPieceValue = pieceValues[(int)move.CapturePieceType];
+                int movingPieceValue = pieceValues[(int)move.MovePieceType];
+
+                // Only captures into a dangerous position if target value is higher
+                // than the moving piece
+                if (
+                    board.SquareIsAttackedByOpponent(move.TargetSquare)
+                    && movingPieceValue >= capturedPieceValue
+                )
+                {
+                    continue;
+                }
 
                 if (capturedPieceValue > highestValueCapture)
                 {

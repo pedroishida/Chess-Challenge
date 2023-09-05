@@ -1,5 +1,4 @@
 ﻿using ChessChallenge.API;
-using System;
 
 namespace ChessChallenge.Example
 {
@@ -14,60 +13,111 @@ namespace ChessChallenge.Example
         public Move Think(Board board, Timer timer)
         {
             Move[] allMoves = board.GetLegalMoves();
+            long score = - pieceValues[6];
+            int maxDepth = 3;
 
-            Random rng = new();
             Move moveToPlay = allMoves[0];
-            int highestValueCapture = 0;
-
-            // Pick a random move to play that does not put the piece in danger
-            int i = 0;
-            do
-            {
-                moveToPlay = allMoves[rng.Next(allMoves.Length)];
-                i++;
-            } while (i < allMoves.Length &&
-                board.SquareIsAttackedByOpponent(moveToPlay.TargetSquare));
 
             foreach (Move move in allMoves)
             {
-                // Always play checkmate in one
-                if (MoveIsCheckmate(board, move))
+                long currentScore;
+                board.MakeMove(move);
+                currentScore = AlphaBetaMin(
+                    board,
+                    long.MinValue,
+                    long.MaxValue,
+                    maxDepth
+                );
+                board.UndoMove(move);
+                if (score <= currentScore)
                 {
+                    score = currentScore;
                     moveToPlay = move;
-                    break;
-                }
-
-                // Find highest value capture
-                int capturedPieceValue = pieceValues[(int)move.CapturePieceType];
-                int movingPieceValue = pieceValues[(int)move.MovePieceType];
-
-                // Only captures into a dangerous position if target value is higher
-                // than the moving piece
-                if (
-                    board.SquareIsAttackedByOpponent(move.TargetSquare)
-                    && movingPieceValue >= capturedPieceValue
-                )
-                {
-                    continue;
-                }
-
-                if (capturedPieceValue > highestValueCapture)
-                {
-                    moveToPlay = move;
-                    highestValueCapture = capturedPieceValue;
                 }
             }
 
             return moveToPlay;
         }
 
-        // Test if this move gives checkmate
-        bool MoveIsCheckmate(Board board, Move move)
+        public long AlphaBetaMin(Board board, long alpha, long beta, int depth)
         {
-            board.MakeMove(move);
-            bool isMate = board.IsInCheckmate();
-            board.UndoMove(move);
-            return isMate;
+            if (0 >= depth || board.IsInCheckmate() || board.IsDraw())
+            {
+                return - Evaluate(board);
+            }
+            else
+            {
+                foreach (Move move in board.GetLegalMoves())
+                {
+                    long score;
+                    board.MakeMove(move);
+                    score = AlphaBetaMax(board, alpha, beta, depth - 1);
+                    board.UndoMove(move);
+                    if (score <= alpha)
+                    {
+                        return alpha;
+                    }
+                    if (score < beta)
+                    {
+                        beta = score;
+                    }
+                }
+
+                return beta;
+            }
+        }
+
+        public long AlphaBetaMax(Board board, long alpha, long beta, int depth)
+        {
+            if (0 >= depth || board.IsInCheckmate() || board.IsDraw())
+            {
+                return Evaluate(board);
+            }
+            else
+            {
+                foreach (Move move in board.GetLegalMoves())
+                {
+                    long score;
+                    board.MakeMove(move);
+                    score = AlphaBetaMin(board, alpha, beta, depth - 1);
+                    board.UndoMove(move);
+                    if (score >= beta)
+                    {
+                        return beta;
+                    }
+                    if (score > alpha)
+                    {
+                        alpha = score;
+                    }
+                }
+
+                return alpha;
+            }
+        }
+
+        public long Evaluate(Board board)
+        {
+            long score = 0;
+
+            if (board.IsInCheckmate())
+            {
+                return - pieceValues[6];
+            }
+
+            foreach (PieceList pieces in board.GetAllPieceLists())
+            {
+                foreach (Piece piece in pieces)
+                {
+                    long pieceScore = pieceValues[(int)piece.PieceType];
+                    if (board.IsWhiteToMove != piece.IsWhite)
+                    {
+                        pieceScore = - pieceScore;
+                    }
+                    score += pieceScore;
+                }
+            }
+
+            return score;
         }
     }
 }

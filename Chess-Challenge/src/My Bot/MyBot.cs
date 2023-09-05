@@ -1,32 +1,39 @@
 ﻿using ChessChallenge.API;
+using System;
 
 public class MyBot : IChessBot
 {
     // Piece values: null, pawn, knight, bishop, rook, queen, king
-    long[] pieceValues = { 0, 10, 30, 30, 50, 90, 1000 };
+    int[] pieceValues = { 0, 10, 30, 30, 50, 90, 2000 };
 
     public Move Think(Board board, Timer timer)
     {
+        Random rng = new();
         Move[] allMoves = board.GetLegalMoves();
-        long score = - pieceValues[6];
-        int maxDepth = 3;
+        int beta = - pieceValues[6] + 1;
+        int alpha = beta;
+        int maxDepth = 4;
 
         Move moveToPlay = allMoves[0];
 
         foreach (Move move in allMoves)
         {
-            long currentScore;
+            int score;
             board.MakeMove(move);
-            currentScore = AlphaBetaMin(
+            score = - AlphaBeta(
                 board,
-                long.MinValue,
-                long.MaxValue,
+                beta,
+                - beta,
                 maxDepth
             );
             board.UndoMove(move);
-            if (score <= currentScore)
+            if (score > alpha)
             {
-                score = currentScore;
+                alpha = score;
+                moveToPlay = move;
+            }
+            else if (score == alpha && 0 != rng.Next(2))
+            {
                 moveToPlay = move;
             }
         }
@@ -34,35 +41,7 @@ public class MyBot : IChessBot
         return moveToPlay;
     }
 
-    public long AlphaBetaMin(Board board, long alpha, long beta, int depth)
-    {
-        if (0 >= depth || board.IsInCheckmate() || board.IsDraw())
-        {
-            return - Evaluate(board);
-        }
-        else
-        {
-            foreach (Move move in board.GetLegalMoves())
-            {
-                long score;
-                board.MakeMove(move);
-                score = AlphaBetaMax(board, alpha, beta, depth - 1);
-                board.UndoMove(move);
-                if (score <= alpha)
-                {
-                    return alpha;
-                }
-                if (score < beta)
-                {
-                    beta = score;
-                }
-            }
-
-            return beta;
-        }
-    }
-
-    public long AlphaBetaMax(Board board, long alpha, long beta, int depth)
+    public int AlphaBeta(Board board, int alpha, int beta, int depth)
     {
         if (0 >= depth || board.IsInCheckmate() || board.IsDraw())
         {
@@ -72,9 +51,9 @@ public class MyBot : IChessBot
         {
             foreach (Move move in board.GetLegalMoves())
             {
-                long score;
+                int score;
                 board.MakeMove(move);
-                score = AlphaBetaMin(board, alpha, beta, depth - 1);
+                score = - AlphaBeta(board, - beta, - alpha, depth - 1);
                 board.UndoMove(move);
                 if (score >= beta)
                 {
@@ -90,25 +69,31 @@ public class MyBot : IChessBot
         }
     }
 
-    public long Evaluate(Board board)
+    public int Evaluate(Board board)
     {
-        long score = 0;
+        int score = 0;
 
         if (board.IsInCheckmate())
         {
             return - pieceValues[6];
         }
 
+        if (board.IsDraw())
+        {
+            return 0;
+        }
+
         foreach (PieceList pieces in board.GetAllPieceLists())
         {
-            foreach (Piece piece in pieces)
+            int pieceScore = pieceValues[(int)pieces.TypeOfPieceInList] * pieces.Count;
+
+            if (board.IsWhiteToMove == pieces.IsWhitePieceList)
             {
-                long pieceScore = pieceValues[(int)piece.PieceType];
-                if (board.IsWhiteToMove != piece.IsWhite)
-                {
-                    pieceScore = - pieceScore;
-                }
                 score += pieceScore;
+            }
+            else
+            {
+                score -= pieceScore;
             }
         }
 
